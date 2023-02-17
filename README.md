@@ -6,6 +6,9 @@ The output of the actions can be viewed from the Actions tab in the main reposit
 
 Terragrunt GitHub Actions are a single GitHub Action that executes different Terragrunt subcommands depending on the content of the GitHub Actions YAML file.
 
+## Style guide
+Implement good practices following the Google's style guide: https://google.github.io/styleguide/shellguide.html#s7-naming-conventions
+
 ## Success Criteria
 
 An exit code of `0` is considered a successful execution.
