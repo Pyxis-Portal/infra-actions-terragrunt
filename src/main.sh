@@ -6,206 +6,211 @@ function stripColors {
 
 function hasPrefix {
   case ${2} in
-    "${1}"*)
-      true
-      ;;
-    *)
-      false
-      ;;
+  "${1}"*)
+    true
+    ;;
+  *)
+    false
+    ;;
   esac
 }
 
-function parseInputs {
+function parse_inputs {
   # Required inputs
   if [ "${INPUT_TF_ACTIONS_VERSION}" != "" ]; then
-    tfVersion=${INPUT_TF_ACTIONS_VERSION}
+    tf_version=${INPUT_TF_ACTIONS_VERSION}
   else
     echo "Input terraform_version cannot be empty"
     exit 1
   fi
 
   if [ "${INPUT_TG_ACTIONS_VERSION}" != "" ]; then
-    tgVersion=${INPUT_TG_ACTIONS_VERSION}
+    tg_version=${INPUT_TG_ACTIONS_VERSION}
   else
     echo "Input terragrunt_version cannot be empty"
     exit 1
   fi
 
   if [ "${INPUT_TF_ACTIONS_SUBCOMMAND}" != "" ]; then
-    tfSubcommand=${INPUT_TF_ACTIONS_SUBCOMMAND}
+    tf_subcommand=${INPUT_TF_ACTIONS_SUBCOMMAND}
   else
     echo "Input terraform_subcommand cannot be empty"
     exit 1
   fi
 
   # Optional inputs
-  tfWorkingDir="."
+  tf_working_dir="."
   if [[ -n "${INPUT_TF_ACTIONS_WORKING_DIR}" ]]; then
-    tfWorkingDir=${INPUT_TF_ACTIONS_WORKING_DIR}
+    tf_working_dir=${INPUT_TF_ACTIONS_WORKING_DIR}
   fi
 
-  tfBinary="terragrunt"
+  tf_binary="terragrunt"
   if [[ -n "${INPUT_TF_ACTIONS_BINARY}" ]]; then
-    tfBinary=${INPUT_TF_ACTIONS_BINARY}
+    tf_binary=${INPUT_TF_ACTIONS_BINARY}
   fi
 
-  tfComment=0
+  tf_comment=0
   if [ "${INPUT_TF_ACTIONS_COMMENT}" == "1" ] || [ "${INPUT_TF_ACTIONS_COMMENT}" == "true" ]; then
-    tfComment=1
+    tf_comment=1
   fi
 
-  tfCLICredentialsHostname=""
+  tf_cli_credentials_hostname=""
   if [ "${INPUT_TF_ACTIONS_CLI_CREDENTIALS_HOSTNAME}" != "" ]; then
-    tfCLICredentialsHostname=${INPUT_TF_ACTIONS_CLI_CREDENTIALS_HOSTNAME}
+    tf_cli_credentials_hostname=${INPUT_TF_ACTIONS_CLI_CREDENTIALS_HOSTNAME}
   fi
 
-  tfCLICredentialsToken=""
+  tf_cli_credentials_token=""
   if [ "${INPUT_TF_ACTIONS_CLI_CREDENTIALS_TOKEN}" != "" ]; then
-    tfCLICredentialsToken=${INPUT_TF_ACTIONS_CLI_CREDENTIALS_TOKEN}
+    tf_cli_credentials_token=${INPUT_TF_ACTIONS_CLI_CREDENTIALS_TOKEN}
   fi
 
-  tfFmtWrite=0
+  tf_fmt_write=0
   if [ "${INPUT_TF_ACTIONS_FMT_WRITE}" == "1" ] || [ "${INPUT_TF_ACTIONS_FMT_WRITE}" == "true" ]; then
-    tfFmtWrite=1
+    tf_fmt_write=1
   fi
 
-  tfWorkspace="default"
+  tf_workspace="default"
   if [ -n "${TF_WORKSPACE}" ]; then
-    tfWorkspace="${TF_WORKSPACE}"
+    tf_workspace="${TF_WORKSPACE}"
   fi
 }
 
-function configureCLICredentials {
-  if [[ ! -f "${HOME}/.terraformrc" ]] && [[ "${tfCLICredentialsToken}" != "" ]]; then
-    cat > ${HOME}/.terraformrc << EOF
-credentials "${tfCLICredentialsHostname}" {
-  token = "${tfCLICredentialsToken}"
+function configure_cli_credentials {
+  if [[ ! -f "${HOME}/.terraformrc" ]] && [[ "${tf_cli_credentials_token}" != "" ]]; then
+    cat >${HOME}/.terraformrc <<EOF
+credentials "${tf_cli_credentials_hostname}" {
+  token = "${tf_cli_credentials_token}"
 }
 EOF
   fi
 }
 
-function installTerraform {
-  if [[ "${tfVersion}" == "latest" ]]; then
+function install_terraform {
+  if [[ "${tf_version}" == "latest" ]]; then
     echo "Checking the latest version of Terraform"
-    tfVersion=$(curl -sL https://releases.hashicorp.com/terraform/index.json | jq -r '.versions[].version' | grep -v '[-].*' | sort -rV | head -n 1)
+    tf_version=$(curl -sL https://releases.hashicorp.com/terraform/index.json | jq -r '.versions[].version' | grep -v '[-].*' | sort -rV | head -n 1)
 
-    if [[ -z "${tfVersion}" ]]; then
+    if [[ -z "${tf_version}" ]]; then
       echo "Failed to fetch the latest version"
       exit 1
     fi
   fi
 
-  url="https://releases.hashicorp.com/terraform/${tfVersion}/terraform_${tfVersion}_linux_amd64.zip"
+  url="https://releases.hashicorp.com/terraform/${tf_version}/terraform_${tf_version}_linux_amd64.zip"
 
-  echo "Downloading Terraform v${tfVersion}"
-  curl -s -S -L -o /tmp/terraform_${tfVersion} ${url}
+  echo "Downloading Terraform v${tf_version}"
+  curl -s -S -L -o /tmp/terraform_${tf_version} ${url}
   if [ "${?}" -ne 0 ]; then
-    echo "Failed to download Terraform v${tfVersion}"
+    echo "Failed to download Terraform v${tf_version}"
     exit 1
   fi
-  echo "Successfully downloaded Terraform v${tfVersion}"
+  echo "Successfully downloaded Terraform v${tf_version}"
 
-  echo "Unzipping Terraform v${tfVersion}"
-  unzip -d /usr/local/bin /tmp/terraform_${tfVersion} &> /dev/null
+  echo "Unzipping Terraform v${tf_version}"
+  unzip -d /usr/local/bin /tmp/terraform_${tf_version} &>/dev/null
   if [ "${?}" -ne 0 ]; then
-    echo "Failed to unzip Terraform v${tfVersion}"
+    echo "Failed to unzip Terraform v${tf_version}"
     exit 1
   fi
-  echo "Successfully unzipped Terraform v${tfVersion}"
+  echo "Successfully unzipped Terraform v${tf_version}"
 }
 
-function installTerragrunt {
-  if [[ "${tgVersion}" == "latest" ]]; then
+function install_terragrunt {
+  if [[ "${tg_version}" == "latest" ]]; then
     echo "Checking the latest version of Terragrunt"
     latestURL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/gruntwork-io/terragrunt/releases/latest)
-    tgVersion=${latestURL##*/}
+    tg_version=${latestURL##*/}
 
-    if [[ -z "${tgVersion}" ]]; then
+    if [[ -z "${tg_version}" ]]; then
       echo "Failed to fetch the latest version"
       exit 1
     fi
   fi
 
-  url="https://github.com/gruntwork-io/terragrunt/releases/download/${tgVersion}/terragrunt_linux_amd64"
+  url="https://github.com/gruntwork-io/terragrunt/releases/download/${tg_version}/terragrunt_linux_amd64"
 
-  echo "Downloading Terragrunt ${tgVersion}"
+  echo "Downloading Terragrunt ${tg_version}"
   curl -s -S -L -o /tmp/terragrunt ${url}
   if [ "${?}" -ne 0 ]; then
-    echo "Failed to download Terragrunt ${tgVersion}"
+    echo "Failed to download Terragrunt ${tg_version}"
     exit 1
   fi
-  echo "Successfully downloaded Terragrunt ${tgVersion}"
+  echo "Successfully downloaded Terragrunt ${tg_version}"
 
-  echo "Moving Terragrunt ${tgVersion} to PATH"
+  echo "Moving Terragrunt ${tg_version} to PATH"
   chmod +x /tmp/terragrunt
-  mv /tmp/terragrunt /usr/local/bin/terragrunt 
+  mv /tmp/terragrunt /usr/local/bin/terragrunt
   if [ "${?}" -ne 0 ]; then
-    echo "Failed to move Terragrunt ${tgVersion}"
+    echo "Failed to move Terragrunt ${tg_version}"
     exit 1
   fi
-  echo "Successfully moved Terragrunt ${tgVersion}"
+  echo "Successfully moved Terragrunt ${tg_version}"
 }
 
 function main {
   # Source the other files to gain access to their functions
-  scriptDir=$(dirname ${0})
-  source ${scriptDir}/terragrunt_fmt.sh
-  source ${scriptDir}/terragrunt_init.sh
-  source ${scriptDir}/terragrunt_validate.sh
-  source ${scriptDir}/terragrunt_plan.sh
-  source ${scriptDir}/terragrunt_apply.sh
-  source ${scriptDir}/terragrunt_output.sh
-  source ${scriptDir}/terragrunt_import.sh
-  source ${scriptDir}/terragrunt_taint.sh
-  source ${scriptDir}/terragrunt_destroy.sh
+  script_dir=$(dirname ${0})
+  source ${script_dir}/terragrunt_fmt.sh
+  source ${script_dir}/terragrunt_init.sh
+  source ${script_dir}/terragrunt_validate.sh
+  source ${script_dir}/terragrunt_plan.sh
+  source ${script_dir}/terragrunt_apply.sh
+  source ${script_dir}/terragrunt_output.sh
+  source ${script_dir}/terragrunt_import.sh
+  source ${script_dir}/terragrunt_taint.sh
+  source ${script_dir}/terragrunt_destroy.sh
+  source ${script_dir}/terragrunt_hclfmt.sh
 
-  parseInputs
-  configureCLICredentials
-  installTerraform
-  cd ${GITHUB_WORKSPACE}/${tfWorkingDir}
+  parse_inputs
+  configure_cli_credentials
+  install_terraform
+  cd ${GITHUB_WORKSPACE}/${tf_working_dir}
 
-  case "${tfSubcommand}" in
-    fmt)
-      installTerragrunt
-      terragruntFmt ${*}
-      ;;
-    init)
-      installTerragrunt
-      terragruntInit ${*}
-      ;;
-    validate)
-      installTerragrunt
-      terragruntValidate ${*}
-      ;;
-    plan)
-      installTerragrunt
-      terragruntPlan ${*}
-      ;;
-    apply)
-      installTerragrunt
-      terragruntApply ${*}
-      ;;
-    output)
-      installTerragrunt
-      terragruntOutput ${*}
-      ;;
-    import)
-      installTerragrunt
-      terragruntImport ${*}
-      ;;
-    taint)
-      installTerragrunt
-      terragruntTaint ${*}
-      ;;
-    destroy)
-      installTerragrunt
-      terragruntDestroy ${*}
-      ;;
-    *)
-      echo "Error: Must provide a valid value for terragrunt_subcommand"
-      exit 1
-      ;;
+  case "${tf_subcommand}" in
+  hclfmt)
+    install_terragrunt
+    terragrunt_hcl_fmt ${*}
+    ;;
+  fmt)
+    install_terragrunt
+    terragrunt_fmt ${*}
+    ;;
+  init)
+    install_terragrunt
+    terragrunt_init ${*}
+    ;;
+  validate)
+    install_terragrunt
+    terragrunt_validate ${*}
+    ;;
+  plan)
+    install_terragrunt
+    terragrunt_plan ${*}
+    ;;
+  apply)
+    install_terragrunt
+    terragrunt_apply ${*}
+    ;;
+  output)
+    install_terragrunt
+    terragrunt_output ${*}
+    ;;
+  import)
+    install_terragrunt
+    terragrunt_import ${*}
+    ;;
+  taint)
+    install_terragrunt
+    terragrunt_taint ${*}
+    ;;
+  destroy)
+    install_terragrunt
+    terragrunt_destroy ${*}
+    ;;
+  *)
+    echo "Error: Must provide a valid value for terragrunt_subcommand"
+    exit 1
+    ;;
   esac
 }
 
